@@ -3,7 +3,12 @@
 *      			 Operating Systems
 *
 *	By: Etiandro André 2017290285 and João Pedro Dionísio 
-*
+*	
+*/
+/* Para defesa Intermedia falta:
+*	-Criação dos processos Gestores de Equipa
+*	-Criar threads carro
+*	-Envio sincronizado do output para ficheiro de log e ecrã.
 */
 #include <stdio.h>
 #include <string.h>
