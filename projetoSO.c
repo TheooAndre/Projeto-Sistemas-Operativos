@@ -173,6 +173,8 @@ int main(){ // Race Simulator
 	return 0;
 }
 
+
+
 int* config (void){
 	FILE * fp;
 	static int array[0];
@@ -234,7 +236,23 @@ void project_output_log()
 
 void race_manager()
 {
-	
+
+	printf("RACE MANAGER STARTED\n");
+	int i = 0, j = 0;
+	for (int i = 0; i < NUM_TEAMS; i++){
+		if((teams[j] = fork()) == 0){
+			printf("TEAM MANAGER STARTED\n");
+			exit(0);
+		}else if(teams[j] == -1){
+			perror("Failed to create team manager process\n");
+			exit(1);
+		}
+		++j;		
+		}
+
+	}
+
+
 	race_manager = getpid();
 	#ifdef DEBUG
 	printf("[%d] Race Manager Process created\n",getpid());
