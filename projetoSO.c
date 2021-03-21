@@ -5,10 +5,11 @@
 *	By: Etiandro André 2017290285 and João Pedro Dionísio 
 *	
 */
+
 /* Para defesa Intermedia falta:
 *	-Criação dos processos Gestores de Equipa
 *	-Criar threads carro
-*	-Envio sincronizado do output para ficheiro de log e ecrã.
+*	-Envio sincronizado do output para ficheiro de log e ecrã. **
 */
 #include <stdio.h>
 #include <string.h>
@@ -30,6 +31,7 @@
 
 
 #define NUM_TEAMS 3
+#define LOGFILE "output.log"
 #define STATS "ESTATISTICAS"
 #define SHARED_MEM "MEMORIA_PARTILHADA"
 #define INPUT_PIPE "input_pipe"
@@ -57,6 +59,7 @@ pid_t race_simulator, malfunction_manager, race_manager;
 pthread_cond_t cond=PTHREAD_COND_INITIALIZER;
 pthread_mutex_t mut1=PTHREAD_MUTEX_INITIALIZER;
 sem_t *mutex_statistic;
+sem_t *mutex_log_file;
 int fd_named_pipe;
 int mqid;
 int id_stat;
@@ -83,21 +86,21 @@ int main(){ // Race Simulator
 	ar = config();
 
 	
-	memory->time_units_second = *(ar);
-	memory->lap_distance = *(ar +1);
-	memory->lap_count = *(ar+2);
+	stats->time_units_second = *(ar);
+	stats->lap_distance = *(ar +1);
+	stats->lap_count = *(ar+2);
 	if(*(ar+3)>2){
-		memory-> team_count = *(ar+3);
+		stats-> team_count = *(ar+3);
 		
 	}else{
 		printf("Minimum of 3 teams required to start race\nExiting simulator...\n");
 		exit(1);
 	}
 
-	memory->breakdown_check_timer = *(ar+4);
-	memory->min_pit = *(ar+5);
-	memory->max_pit = *(ar+6);
-	memory->fuel_capacity = *(ar+7);
+	stats->breakdown_check_timer = *(ar+4);
+	stats->min_pit = *(ar+5);
+	stats->max_pit = *(ar+6);
+	stats->fuel_capacity = *(ar+7);
 
 	fflush(stdout);
 
@@ -122,14 +125,21 @@ int main(){ // Race Simulator
 
 	if ((mutex_statistic = sem_open(STATS, O_CREAT | O_EXCL, 0777, 1)) == SEM_FAILED) 
    		destroy_everything(5);
+   	if ((mutex_log_file = sem_open(WRITE_LOG, O_CREAT | O_EXCL, 0777, 1)) == SEM_FAILED) 
+   		destroy_everything(5);
    	if ((mutex_race_managing_shm = sem_open(SHARED_MEM, O_CREAT | O_EXCL, 0777, 1)) == SEM_FAILED) 
 		destroy_everything(5);
+	
+	project_output_log();
+
+	
    	mqid = msgget(IPC_PRIVATE, IPC_CREAT|0777);
   	if (mqid < 0)
     	destroy_everything(3);
     #ifdef DEBUG
 	printf("Message Queue created\n");
 	#endif
+
 	creat_shm_statistics();
 	#ifdef DEBUG
 	printf("Shared for statistics memory created\n");
@@ -168,7 +178,7 @@ int* config (void){
 	static int array[0];
 	char *token;
 	int i = 0;
-	fp = fopen("/home/user/Desktop/scripts/projeto/config.txt", "r");
+	fp = fopen("~/Desktop/Projeto_SO/config.txt", "r");
 	if(fp == NULL){
 		perror("failed: ");
 		return 1;
@@ -187,6 +197,39 @@ int* config (void){
 	}
 	fclose(fp);
 	return array;
+}
+void log_file_write(char* words)
+{
+	/*We call this function everytime we want to write something to log
+	 we just need to write the string as an argument
+	 semaphore to have write sequence so 2 process cant write at the same time and overwrite it
+	*/
+
+    if(sem_wait(mutex_log_file)==-1)
+		destroy_everything(5);
+	FILE *log;
+	char acttime[MAX_TIME];
+	struct tm *get_time;
+	time_t moment = time(0);
+    get_time = gmtime (&moment);
+	log = fopen(LOGFILE,"a");
+	if(log==NULL)
+		destroy_everything(8);
+    strftime (acttime, sizeof(acttime), "%H:%M:%S ", get_time);
+	fprintf(log, "%s%s\n",acttime,words);
+	fclose(log);
+	printf("%s\n", words);
+	if(sem_post(mutex_log_file)==-1)
+		destroy_everything(5);
+}
+void project_output_log()
+{
+	//Functin that opens logfile for write-only option
+	FILE *log;
+	log = fopen(LOGFILE,"w");
+	if(log==NULL)
+		destroy_everything(8);
+	fclose(log);
 }
 
 void race_manager()
