@@ -158,11 +158,7 @@ void creat_shm_statistics()
 	statis = (Statistics*)shmat(id_stat,NULL,0);
 	if(statis==(Statistics*)-1)
 		destroy_everything(1);
-	statis->total_pack_indrones=0;
-	statis->total_pack_inwarehouses=0;
-	statis->total_pack_sent=0;
-	statis->total_products_sent=0;
-	statis->total_delivery_time=0.0;
+	
 }
 
 void signal_sigint()
