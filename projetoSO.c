@@ -24,6 +24,7 @@
 #include <fcntl.h>
 
 
+#define NUM_TEAMS 3
 #define STATS "ESTATISTICAS"
 #define SHARED_MEM "MEMORIA_PARTILHADA"
 #define INPUT_PIPE "input_pipe"
@@ -34,11 +35,19 @@
 
 typedef struct Statistics
 {
-	
+	int time_units_second;
+	int lap_distance;
+	int lap_count;
+	int team_count;
+	int breakdown_check_timer;
+	int min_pit;
+	int max_pit;
+	int fuel_capacity;
 }Statistics;
 
 //--GLOBAL VARIABLES---------
 Statistics* stats;
+pid_t teams[];
 pid_t race_simulator, malfunction_manager, race_manager;
 pthread_cond_t cond=PTHREAD_COND_INITIALIZER;
 pthread_mutex_t mut1=PTHREAD_MUTEX_INITIALIZER;
@@ -48,7 +57,7 @@ int mqid;
 int id_stat;
 
 //--FUNCTIONS-----------------
-int read_config();
+int config();
 void race_manager();
 void signal_sigint();
 void handl_sigs();
@@ -64,6 +73,28 @@ int main(){ // Race Simulator
 	5-Signal handling SIGSTP that prints the log and SIGINT to end the race and the program
 	must wait for the cars to end the race and then print the log and free every resource
 	*/
+
+	int *ar;
+	ar = config();
+
+	
+	memory->time_units_second = *(ar);
+	memory->lap_distance = *(ar +1);
+	memory->lap_count = *(ar+2);
+	if(*(ar+3)>2){
+		memory-> team_count = *(ar+3);
+		
+	}else{
+		printf("Minimum of 3 teams required to start race\nExiting simulator...\n");
+		exit(1);
+	}
+
+	memory->breakdown_check_timer = *(ar+4);
+	memory->min_pit = *(ar+5);
+	memory->max_pit = *(ar+6);
+	memory->fuel_capacity = *(ar+7);
+
+	fflush(stdout);
 
 	if(signal(SIGINT,SIG_IGN)==SIG_ERR)
 	{
@@ -125,6 +156,32 @@ int main(){ // Race Simulator
 
 
 	return 0;
+}
+
+int* config (void){
+	FILE * fp;
+	static int array[0];
+	char *token;
+	int i = 0;
+	fp = fopen("/home/user/Desktop/scripts/projeto/config.txt", "r");
+	if(fp == NULL){
+		perror("failed: ");
+		return 1;
+	}
+	char buffer[20];
+	while(fgets(buffer, 20 -5, fp)){
+		buffer[strcspn(buffer, "\n")] = 0;
+		token = strtok(buffer,",");
+		array[i] = atoi(token);
+		i++;
+		token = strtok(NULL,",");
+		if(token != NULL){
+			array[i] = atoi(token);
+			i++;
+		}
+	}
+	fclose(fp);
+	return array;
 }
 
 void race_manager()
