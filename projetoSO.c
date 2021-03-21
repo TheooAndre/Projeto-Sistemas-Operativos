@@ -70,6 +70,7 @@ void race_manager();
 void signal_sigint();
 void handl_sigs();
 void malfunction_manager();
+void team_manager();
 
 int main(){ // Race Simulator
 	/*
@@ -236,29 +237,37 @@ void project_output_log()
 
 void race_manager()
 {
-
-	printf("RACE MANAGER STARTED\n");
-	int i = 0, j = 0;
-	for (int i = 0; i < NUM_TEAMS; i++){
-		if((teams[j] = fork()) == 0){
-			printf("TEAM MANAGER STARTED\n");
-			exit(0);
-		}else if(teams[j] == -1){
-			perror("Failed to create team manager process\n");
-			exit(1);
-		}
-		++j;		
-		}
-
-	}
-
-
 	race_manager = getpid();
 	#ifdef DEBUG
 	printf("[%d] Race Manager Process created\n",getpid());
 	#endif
+	//exit() //Remove later
+
+	for (int i = 0; i < NUM_TEAMS; i++){
+		if((teams[i] = fork()) == 0){
+			#ifdef DEBUG
+			printf("TEAM MANAGER STARTED\n");
+			#endif
+			team_manager();
+			exit(0);
+
+		}
+		else if(teams[i] == -1){
+			destroy_everything(2);
+		}			
+	}	
+}
+
+void team_manager()
+{
+	//CRIAR THREADS CARRO
+	team_manager = getpid();
+	#ifdef DEBUG
+	printf("[%d] Team Manager Process created\n",getpid());
+	#endif
 	exit() //Remove later
 }
+
 
 void malfunction_manager()
 {
