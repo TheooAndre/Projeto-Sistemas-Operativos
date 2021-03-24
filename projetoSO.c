@@ -36,6 +36,7 @@
 #define SHARED_MEM "MEMORIA_PARTILHADA"
 #define INPUT_PIPE "input_pipe"
 #define CONFIGFILE "config.txt"
+#define MAX_CARS 5 //depois remover, cars added in the team manager named pipe
 #define DEBUG
 
 //--STRUCTS------------------
@@ -50,12 +51,27 @@ typedef struct Statistics
 	int min_pit;
 	int max_pit;
 	int fuel_capacity;
+	int top_5[5];
+	int last_place;
 }Statistics;
+
+typedef struct Car
+{
+	int car_id;
+	int lap_count;
+	int fuel_capacity;
+	bool issecurity = false; // verificar se esta no modo seguranca ou nao(normal)
+	bool isRacing = false;
+	bool isInBox = false; 
+	bool isEmpty = false;
+	bool isDone = false;
+}Car;
 
 //--GLOBAL VARIABLES---------
 Statistics* stats;
 pid_t teams[];
 pid_t race_simulator, malfunction_manager, race_manager;
+pthread_t cars[MAX_CARS];
 pthread_cond_t cond=PTHREAD_COND_INITIALIZER;
 pthread_mutex_t mut1=PTHREAD_MUTEX_INITIALIZER;
 sem_t *mutex_statistic;
@@ -63,6 +79,7 @@ sem_t *mutex_log_file;
 int fd_named_pipe;
 int mqid;
 int id_stat;
+Car car_struct[MAX_CARS];
 
 //--FUNCTIONS-----------------
 int config();
@@ -265,9 +282,53 @@ void team_manager()
 	#ifdef DEBUG
 	printf("[%d] Team Manager Process created\n",getpid());
 	#endif
+	//Adiciona os carros de acordo aos comandos da named pipe!
+	if((fd_named_pipe=(mkfifo(INPUT_PIPE,O_CREAT|0600)<0)) && errno!=EEXIST)
+		destroy_everything(7);
+	if((fd_named_pipe = open(INPUT_PIPE,O_RDWR)) < 0)
+		destroy_everything(7);
+
+	for (int i = 0; i < 3; ++i)
+	{
+		/*
+		int lap_count;
+	int fuel_capacity;
+	bool issecurity = false; // verificar se esta no modo seguranca ou nao(normal)
+	bool isRacing = false;
+	bool isInBox = false; 
+	bool isEmpty = false;
+	bool isDone = false;
+	*/
+		car_struct[i].lap_count=0;
+		car_struct[i].car_id=i;
+		//car_struct[i].state = 1; // we can do states like this or with booleans, ill leave this here so i can think better later
+		car_struct[i].fuel_capacity=1;
+		car_struct[i].issecurity= false;
+		car_struct[i].isRacing = true;
+		car_struct[i].isInBox= false;
+		car_struct[i].isEmpty= false;
+		car_struct[i].isDone= false;
+
+		if (pthread_create(&cars[i], NULL, car,&car_struct[i])!=0)
+			destroy_everything(6);
+		usleep(20);
+	}
+	#ifdef DEBUG
+	printf("All cars created\n");
+	#endif
+
 	exit() //Remove later
 }
 
+
+void *car(void *n)
+{
+	Car car = *((car *)n);
+	#ifdef DEBUG
+	printf("[%d]Car created\n",car.car_id);
+	#endif
+	pthread_exit(NULL);
+}
 
 void malfunction_manager()
 {
@@ -303,7 +364,7 @@ void signal_sigint()
 	   
 		
 		char buf[MAX_NAME];
-		sprintf(buf,"DRONE_FREE ");
+		sprintf(buf,"CAR FREE ");
 		write(fd_named_pipe,buf,sizeof(buf));
 		while(wait(NULL) != -1);
 		//write_shm_statistics_terminal();
@@ -325,7 +386,7 @@ void signal_sigint()
 			destroy_everything(7);
 		
 		
-		if(shmdt(statis)==-1)
+		if(shmdt(stats)==-1)
 			destroy_everything(1);
 		if(shmctl(id_stat,IPC_RMID,NULL)==-1)
 			destroy_everything(1);
