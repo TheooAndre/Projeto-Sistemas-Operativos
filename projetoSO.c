@@ -95,14 +95,14 @@ int main(){ // Race Simulator
 	1- Read config file **
 	2-Create Named Pipe that communicates with the race manager
 	3-inicialize race manager process**
-	4-inicialize malfunction manager
+	4-inicialize malfunction manager**
 	5-Signal handling SIGSTP that prints the log and SIGINT to end the race and the program
 	must wait for the cars to end the race and then print the log and free every resource
 	*/
 
 	int *ar;
 	ar = config();
-
+	project_output_log();
 	
 	stats->time_units_second = *(ar);
 	stats->lap_distance = *(ar +1);
@@ -112,6 +112,7 @@ int main(){ // Race Simulator
 		
 	}else{
 		printf("Minimum of 3 teams required to start race\nExiting simulator...\n");
+		log_file_write("Minimum of 3 teams required to start race\nExiting simulator...\n");
 		exit(1);
 	}
 
@@ -125,11 +126,13 @@ int main(){ // Race Simulator
 	if(signal(SIGINT,SIG_IGN)==SIG_ERR)
 	{
 		printf("Error: Signal failed!\n");
+		log_file_write("Error: Signal failed!\n");
 		exit(EXIT_FAILURE);
 	}
 	if(signal(SIGUSR1,SIG_IGN)==SIG_ERR)
 	{
 		printf("Error: Signal failed!\n");
+		log_file_write("Error: Signal failed!\n");
 		exit(EXIT_FAILURE);
 	}
 	printf("[%d]RACE SIMULATOR\n",getpid());
@@ -148,7 +151,7 @@ int main(){ // Race Simulator
    	if ((mutex_race_managing_shm = sem_open(SHARED_MEM, O_CREAT | O_EXCL, 0777, 1)) == SEM_FAILED) 
 		destroy_everything(5);
 	
-	project_output_log();
+	
 
 	
    	mqid = msgget(IPC_PRIVATE, IPC_CREAT|0777);
@@ -157,11 +160,13 @@ int main(){ // Race Simulator
     #ifdef DEBUG
 	printf("Message Queue created\n");
 	#endif
+	log_file_write("Message Queue created\n");
 
 	creat_shm_statistics();
 	#ifdef DEBUG
 	printf("Shared for statistics memory created\n");
 	#endif
+	log_file_write("Shared for statistics memory created\n");
 	race_simulator = getpid();
 	int p_race_manager,p_malfunction_manager;
 
@@ -203,6 +208,7 @@ int* config (void){
 		perror("failed: ");
 		return 1;
 	}
+
 	char buffer[20];
 	while(fgets(buffer, 20 -5, fp)){
 		buffer[strcspn(buffer, "\n")] = 0;
@@ -244,7 +250,7 @@ void log_file_write(char* words)
 }
 void project_output_log()
 {
-	//Functin that opens logfile for write-only option
+	//Function that opens logfile for write-only option
 	FILE *log;
 	log = fopen(LOGFILE,"w");
 	if(log==NULL)
@@ -258,6 +264,7 @@ void race_manager()
 	#ifdef DEBUG
 	printf("[%d] Race Manager Process created\n",getpid());
 	#endif
+	log_file_write("Race Manager Process created\n")
 	//exit() //Remove later
 
 	for (int i = 0; i < NUM_TEAMS; i++){
@@ -265,6 +272,7 @@ void race_manager()
 			#ifdef DEBUG
 			printf("TEAM MANAGER STARTED\n");
 			#endif
+			log_file_write("TEAM MANAGER STARTED\n")
 			team_manager();
 			exit(0);
 
@@ -292,12 +300,12 @@ void team_manager()
 	{
 		/*
 		int lap_count;
-	int fuel_capacity;
-	bool issecurity = false; // verificar se esta no modo seguranca ou nao(normal)
-	bool isRacing = false;
-	bool isInBox = false; 
-	bool isEmpty = false;
-	bool isDone = false;
+		int fuel_capacity;
+		bool issecurity = false; // verificar se esta no modo seguranca ou nao(normal)
+		bool isRacing = false;
+		bool isInBox = false; 
+		bool isEmpty = false;
+		bool isDone = false;
 	*/
 		car_struct[i].lap_count=0;
 		car_struct[i].car_id=i;
@@ -348,8 +356,8 @@ void creat_shm_statistics()
 	id_stat = shmget(IPC_PRIVATE,sizeof(Statistics),IPC_CREAT|0777);
 	if(id_stat <0)
 		destroy_everything(1);
-	statis = (Statistics*)shmat(id_stat,NULL,0);
-	if(statis==(Statistics*)-1)
+	stats = (Statistics*)shmat(id_stat,NULL,0);
+	if(stats==(Statistics*)-1)
 		destroy_everything(1);
 	
 }
