@@ -106,7 +106,7 @@ int main(){ // Race Simulator
 	
 	stats->time_units_second = *(ar);
 	stats->lap_distance = *(ar +1);
-	stats->lap_count = *(ar+2);
+	stats->lap_count = *(ar+2);  //ver depois
 	if(*(ar+3)>2){
 		stats-> team_count = *(ar+3);
 		
