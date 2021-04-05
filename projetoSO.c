@@ -110,7 +110,7 @@ int main(){ // Race Simulator
 	5-Signal handling SIGSTP that prints the log and SIGINT to end the race and the program
 	must wait for the cars to end the race and then print the log and free every resource
 	*/
-	printf("[%d]RACE SIMULATOR\n",getpid());
+	printf("[%d]RACE SIMULATION\n",getpid());
 
 	int *ar;
 	ar =  config();
@@ -213,13 +213,13 @@ int main(){ // Race Simulator
 
 int* config (void){
 	FILE * fp;
-	static int array[0];
+	static int array[9];
 	char *token;
 	int i = 0;
 	fp = fopen("config.txt", "r");
 	if(fp == NULL){
 		perror("failed: ");
-		
+		return 1;
 	}
 
 	char buffer[20];
