@@ -1,4 +1,4 @@
-/*
+/* bb
 * 				  RACE SIMULATOR
 *      			 Operating Systems
 *
@@ -29,9 +29,12 @@
 #include <semaphore.h>
 #include <fcntl.h>
 
-
-#define NUM_TEAMS 3
+#define MAX_TIME 30
+#define MAX_NAME 300
+#define MAX_LOG_CHAR 600
+#define NUM_TEAMS 3// depois remover
 #define LOGFILE "output.log"
+#define WRITE_LOG "ESCRITA_LOG"
 #define STATS "ESTATISTICAS"
 #define SHARED_MEM "MEMORIA_PARTILHADA"
 #define INPUT_PIPE "input_pipe"
@@ -60,34 +63,42 @@ typedef struct Car
 	int car_id;
 	int lap_count;
 	int fuel_capacity;
-	bool issecurity = false; // verificar se esta no modo seguranca ou nao(normal)
-	bool isRacing = false;
-	bool isInBox = false; 
-	bool isEmpty = false;
-	bool isDone = false;
+	int issecurity; // verificar se esta no modo seguranca ou nao(normal)
+	int isRacing;
+	int isInBox; 
+	int isEmpty;
+	int isDone;
 }Car;
 
 //--GLOBAL VARIABLES---------
 Statistics* stats;
-pid_t teams[];
-pid_t race_simulator, malfunction_manager, race_manager;
+pid_t teams[NUM_TEAMS];
+pid_t race_simulator, malfunction_manager, race_manager, team_manager;
 pthread_t cars[MAX_CARS];
 pthread_cond_t cond=PTHREAD_COND_INITIALIZER;
 pthread_mutex_t mut1=PTHREAD_MUTEX_INITIALIZER;
 sem_t *mutex_statistic;
 sem_t *mutex_log_file;
+sem_t *mutex_race_managing_shm;
 int fd_named_pipe;
 int mqid;
 int id_stat;
 Car car_struct[MAX_CARS];
-
+sigset_t block_sigs;
 //--FUNCTIONS-----------------
-int config();
-void race_manager();
+int* config();
+void raceManager();
 void signal_sigint();
 void handl_sigs();
-void malfunction_manager();
-void team_manager();
+void malfunctionManager();
+void teamManager();
+void project_output_log();
+void log_file_write(char* words);
+void *car(void *n);
+void creat_shm_statistics();
+void handl_sigs();
+void destroy_everything(int n);
+
 
 int main(){ // Race Simulator
 	/*
@@ -99,9 +110,11 @@ int main(){ // Race Simulator
 	5-Signal handling SIGSTP that prints the log and SIGINT to end the race and the program
 	must wait for the cars to end the race and then print the log and free every resource
 	*/
+	printf("[%d]RACE SIMULATOR\n",getpid());
 
 	int *ar;
-	ar = config();
+	ar =  config();
+	
 	project_output_log();
 	
 	stats->time_units_second = *(ar);
@@ -135,8 +148,7 @@ int main(){ // Race Simulator
 		log_file_write("Error: Signal failed!\n");
 		exit(EXIT_FAILURE);
 	}
-	printf("[%d]RACE SIMULATOR\n",getpid());
-
+	
 	if(sem_unlink(STATS) == EACCES)
 		destroy_everything(5);
 	if(sem_unlink(SHARED_MEM) == EACCES)
@@ -166,6 +178,7 @@ int main(){ // Race Simulator
 	#ifdef DEBUG
 	printf("Shared for statistics memory created\n");
 	#endif
+
 	log_file_write("Shared for statistics memory created\n");
 	race_simulator = getpid();
 	int p_race_manager,p_malfunction_manager;
@@ -176,7 +189,7 @@ int main(){ // Race Simulator
 		destroy_everything(2);
 	else if(p_race_manager == 0)
 	{
-		race_manager();
+		raceManager();
 		exit(0);
 	}
 
@@ -185,7 +198,7 @@ int main(){ // Race Simulator
 		destroy_everything(2);
 	else if(p_malfunction_manager == 0)
 	{
-		malfunction_manager();
+		malfunctionManager();
 		exit(0);
 	}
 	if(signal(SIGINT,signal_sigint)==SIG_ERR)
@@ -203,10 +216,10 @@ int* config (void){
 	static int array[0];
 	char *token;
 	int i = 0;
-	fp = fopen("~/Desktop/Projeto_SO/config.txt", "r");
+	fp = fopen("config.txt", "r");
 	if(fp == NULL){
 		perror("failed: ");
-		return 1;
+		
 	}
 
 	char buffer[20];
@@ -248,6 +261,7 @@ void log_file_write(char* words)
 	if(sem_post(mutex_log_file)==-1)
 		destroy_everything(5);
 }
+
 void project_output_log()
 {
 	//Function that opens logfile for write-only option
@@ -258,13 +272,13 @@ void project_output_log()
 	fclose(log);
 }
 
-void race_manager()
+void raceManager()
 {
 	race_manager = getpid();
 	#ifdef DEBUG
 	printf("[%d] Race Manager Process created\n",getpid());
 	#endif
-	log_file_write("Race Manager Process created\n")
+	log_file_write("Race Manager Process created\n");
 	//exit() //Remove later
 
 	for (int i = 0; i < NUM_TEAMS; i++){
@@ -272,8 +286,8 @@ void race_manager()
 			#ifdef DEBUG
 			printf("TEAM MANAGER STARTED\n");
 			#endif
-			log_file_write("TEAM MANAGER STARTED\n")
-			team_manager();
+			log_file_write("TEAM MANAGER STARTED\n");
+			teamManager();
 			exit(0);
 
 		}
@@ -283,7 +297,7 @@ void race_manager()
 	}	
 }
 
-void team_manager()
+void teamManager()
 {
 	//CRIAR THREADS CARRO
 	team_manager = getpid();
@@ -311,11 +325,11 @@ void team_manager()
 		car_struct[i].car_id=i;
 		//car_struct[i].state = 1; // we can do states like this or with booleans, ill leave this here so i can think better later
 		car_struct[i].fuel_capacity=1;
-		car_struct[i].issecurity= false;
-		car_struct[i].isRacing = true;
-		car_struct[i].isInBox= false;
-		car_struct[i].isEmpty= false;
-		car_struct[i].isDone= false;
+		car_struct[i].issecurity= 0;
+		car_struct[i].isRacing = 1;
+		car_struct[i].isInBox= 0;
+		car_struct[i].isEmpty= 0;
+		car_struct[i].isDone= 0;
 
 		if (pthread_create(&cars[i], NULL, car,&car_struct[i])!=0)
 			destroy_everything(6);
@@ -325,27 +339,27 @@ void team_manager()
 	printf("All cars created\n");
 	#endif
 
-	exit() //Remove later
+	exit(0); //Remove later
 }
 
 
 void *car(void *n)
 {
-	Car car = *((car *)n);
+	Car car = *((Car *)n);
 	#ifdef DEBUG
 	printf("[%d]Car created\n",car.car_id);
 	#endif
 	pthread_exit(NULL);
 }
 
-void malfunction_manager()
+void malfunctionManager()
 {
 	
 	malfunction_manager = getpid();
 	#ifdef DEBUG
 	printf("[%d] Malfunction Manager Process created\n",getpid());
 	#endif
-	exit() // Remove later
+	exit(0); // Remove later
 }
 
 
@@ -449,7 +463,7 @@ void destroy_everything(int n)
 	
 	close(fd_named_pipe);
 	
-	shmdt(statis);
+	shmdt(stats);
 	shmctl(id_stat,IPC_RMID,NULL);
 	msgctl(mqid,IPC_RMID,NULL);
 	printf("Execute kill_ipcs.sh to clean all ipcs");
