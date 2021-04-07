@@ -2,8 +2,8 @@
 * 				  RACE SIMULATOR
 *      			 Operating Systems
 *
-*	By: Etiandro André 2017290285 and João Pedro Dionísio 
-*	
+*	By: Etiandro André 2017290285 and João Pedro Dionísio 2019217030
+*
 */
 
 /* Para defesa Intermedia falta:
@@ -65,7 +65,7 @@ typedef struct Car
 	int fuel_capacity;
 	int issecurity; // verificar se esta no modo seguranca ou nao(normal)
 	int isRacing;
-	int isInBox; 
+	int isInBox;
 	int isEmpty;
 	int isDone;
 }Car;
@@ -110,62 +110,46 @@ int main(){ // Race Simulator
 	5-Signal handling SIGSTP that prints the log and SIGINT to end the race and the program
 	must wait for the cars to end the race and then print the log and free every resource
 	*/
-	printf("[%d]RACE SIMULATION\n",getpid());
-
-	int *ar;
-	ar =  config();
-	
+	printf("[%d]RACE SIMULATOR\n",getpid());
 	project_output_log();
-	
-	stats->time_units_second = *(ar);
-	stats->lap_distance = *(ar +1);
-	stats->lap_count = *(ar+2);  //ver depois
-	if(*(ar+3)>2){
-		stats-> team_count = *(ar+3);
-		
-	}else{
-		printf("Minimum of 3 teams required to start race\nExiting simulator...\n");
-		log_file_write("Minimum of 3 teams required to start race\nExiting simulator...\n");
-		exit(1);
-	}
 
-	stats->breakdown_check_timer = *(ar+4);
-	stats->min_pit = *(ar+5);
-	stats->max_pit = *(ar+6);
-	stats->fuel_capacity = *(ar+7);
 
-	fflush(stdout);
 
 	if(signal(SIGINT,SIG_IGN)==SIG_ERR)
 	{
 		printf("Error: Signal failed!\n");
-		log_file_write("Error: Signal failed!\n");
+		
 		exit(EXIT_FAILURE);
 	}
 	if(signal(SIGUSR1,SIG_IGN)==SIG_ERR)
 	{
 		printf("Error: Signal failed!\n");
-		log_file_write("Error: Signal failed!\n");
+		
 		exit(EXIT_FAILURE);
 	}
-	
+
 	if(sem_unlink(STATS) == EACCES)
 		destroy_everything(5);
+
 	if(sem_unlink(SHARED_MEM) == EACCES)
-		destroy_everything(5);
-	if(unlink(INPUT_PIPE) == EACCES)
+		destroy_everything(1);
+
+	/*if(unlink(INPUT_PIPE) == EACCES)
 		destroy_everything(7);
-
-	if ((mutex_statistic = sem_open(STATS, O_CREAT | O_EXCL, 0777, 1)) == SEM_FAILED) 
-   		destroy_everything(5);
-   	if ((mutex_log_file = sem_open(WRITE_LOG, O_CREAT | O_EXCL, 0777, 1)) == SEM_FAILED) 
-   		destroy_everything(5);
-   	if ((mutex_race_managing_shm = sem_open(SHARED_MEM, O_CREAT | O_EXCL, 0777, 1)) == SEM_FAILED) 
+		*/
+	if(sem_unlink(WRITE_LOG) == EACCES)
 		destroy_everything(5);
-	
-	
 
-	
+	if ((mutex_statistic = sem_open(STATS, O_CREAT | O_EXCL, 0700, 1)) == SEM_FAILED)
+   		destroy_everything(5);
+   	if ((mutex_log_file = sem_open(WRITE_LOG, O_CREAT | O_EXCL, 0700, 1)) == SEM_FAILED)
+   		destroy_everything(5);
+   	if ((mutex_race_managing_shm = sem_open(SHARED_MEM, O_CREAT | O_EXCL, 0700, 1)) == SEM_FAILED)
+		destroy_everything(5);
+
+
+
+/*
    	mqid = msgget(IPC_PRIVATE, IPC_CREAT|0777);
   	if (mqid < 0)
     	destroy_everything(3);
@@ -173,20 +157,21 @@ int main(){ // Race Simulator
 	printf("Message Queue created\n");
 	#endif
 	log_file_write("Message Queue created\n");
+*/
 
 	creat_shm_statistics();
 	#ifdef DEBUG
-	printf("Shared for statistics memory created\n");
+	log_file_write("Shared memory for statistics  created\n");
 	#endif
 
-	log_file_write("Shared for statistics memory created\n");
+	
 	race_simulator = getpid();
 	int p_race_manager,p_malfunction_manager;
 
 	p_race_manager = fork();
-
-	if (p_race_manager < 0)
+	if (p_race_manager < 0){
 		destroy_everything(2);
+	}
 	else if(p_race_manager == 0)
 	{
 		raceManager();
@@ -194,8 +179,10 @@ int main(){ // Race Simulator
 	}
 
 	p_malfunction_manager = fork();
-	if (p_malfunction_manager < 0)
+	if (p_malfunction_manager < 0){
+
 		destroy_everything(2);
+	}
 	else if(p_malfunction_manager == 0)
 	{
 		malfunctionManager();
@@ -204,8 +191,8 @@ int main(){ // Race Simulator
 	if(signal(SIGINT,signal_sigint)==SIG_ERR)
 		destroy_everything(4);
 
-
-
+	
+	//signal_sigint();
 	return 0;
 }
 
@@ -213,17 +200,17 @@ int main(){ // Race Simulator
 
 int* config (void){
 	FILE * fp;
-	static int array[9];
+	static int array[0];
 	char *token;
 	int i = 0;
 	fp = fopen("config.txt", "r");
 	if(fp == NULL){
 		perror("failed: ");
-		return 1;
+
 	}
 
 	char buffer[20];
-	while(fgets(buffer, 20 -5, fp)){
+	while(fgets(buffer, 20, fp)){
 		buffer[strcspn(buffer, "\n")] = 0;
 		token = strtok(buffer,",");
 		array[i] = atoi(token);
@@ -280,21 +267,20 @@ void raceManager()
 	#endif
 	log_file_write("Race Manager Process created\n");
 	//exit() //Remove later
-
 	for (int i = 0; i < NUM_TEAMS; i++){
 		if((teams[i] = fork()) == 0){
 			#ifdef DEBUG
 			printf("TEAM MANAGER STARTED\n");
 			#endif
-			log_file_write("TEAM MANAGER STARTED\n");
+			//log_file_write("TEAM MANAGER STARTED\n");
 			teamManager();
 			exit(0);
 
 		}
 		else if(teams[i] == -1){
 			destroy_everything(2);
-		}			
-	}	
+		}
+	}
 }
 
 void teamManager()
@@ -305,10 +291,10 @@ void teamManager()
 	printf("[%d] Team Manager Process created\n",getpid());
 	#endif
 	//Adiciona os carros de acordo aos comandos da named pipe!
-	if((fd_named_pipe=(mkfifo(INPUT_PIPE,O_CREAT|0600)<0)) && errno!=EEXIST)
+	/*if((fd_named_pipe=(mkfifo(INPUT_PIPE,O_CREAT|0600)<0)) && errno!=EEXIST)
 		destroy_everything(7);
 	if((fd_named_pipe = open(INPUT_PIPE,O_RDWR)) < 0)
-		destroy_everything(7);
+		destroy_everything(7);*/
 
 	for (int i = 0; i < 3; ++i)
 	{
@@ -317,7 +303,7 @@ void teamManager()
 		int fuel_capacity;
 		bool issecurity = false; // verificar se esta no modo seguranca ou nao(normal)
 		bool isRacing = false;
-		bool isInBox = false; 
+		bool isInBox = false;
 		bool isEmpty = false;
 		bool isDone = false;
 	*/
@@ -354,7 +340,7 @@ void *car(void *n)
 
 void malfunctionManager()
 {
-	
+
 	malfunction_manager = getpid();
 	#ifdef DEBUG
 	printf("[%d] Malfunction Manager Process created\n",getpid());
@@ -366,48 +352,86 @@ void malfunctionManager()
 
 void creat_shm_statistics()
 {
+	int *ar;
+	ar =  config();
+
 	//CHANGE STATS CONFIGURATION LATER
 	id_stat = shmget(IPC_PRIVATE,sizeof(Statistics),IPC_CREAT|0777);
-	if(id_stat <0)
+	if(id_stat <0){
+		printf("<0");
 		destroy_everything(1);
+		}
 	stats = (Statistics*)shmat(id_stat,NULL,0);
-	if(stats==(Statistics*)-1)
+	if(stats==(Statistics*)-1){
 		destroy_everything(1);
-	
+		}
+	stats = (Statistics*)malloc(sizeof(Statistics));
+	stats->time_units_second = *(ar);
+	stats->lap_distance = *(ar +1);
+	stats->lap_count = *(ar+2);  //ver depois
+	if(*(ar+3)>2){
+		stats-> team_count = *(ar+3);
+
+	}else{
+		printf("Minimum of 3 teams required to start race\nExiting simulator...\n");
+		log_file_write("Minimum of 3 teams required to start race\nExiting simulator...\n");
+		exit(1);
+	}
+
+	stats->breakdown_check_timer = *(ar+4);
+	stats->min_pit = *(ar+5);
+	stats->max_pit = *(ar+6);
+	stats->fuel_capacity = *(ar+7);
+
+	fflush(stdout);
+
+
 }
 
 void signal_sigint()
 {
-	
+
 	if (getpid() == race_simulator)
 	{
-		if((fd_named_pipe = open(INPUT_PIPE,O_RDWR)) < 0)
+		/*if((fd_named_pipe = open(INPUT_PIPE,O_RDWR)) < 0)
 			destroy_everything(7);
-	   
-		
-		char buf[MAX_NAME];
+*/
+		int i = 0;
+		/*char buf[MAX_NAME];
 		sprintf(buf,"CAR FREE ");
-		write(fd_named_pipe,buf,sizeof(buf));
+		write(fd_named_pipe,buf,sizeof(buf));*/
+		kill(malfunction_manager,SIGKILL);
+		kill(race_manager,SIGKILL);
+		kill(team_manager,SIGKILL);
+		while (i < (NUM_TEAMS))
+		kill(teams[i++], SIGKILL);
 		while(wait(NULL) != -1);
+
 		//write_shm_statistics_terminal();
-		
 		if(sem_unlink(STATS) == -1)
 			destroy_everything(5);
-		
+		if(sem_unlink(WRITE_LOG) == -1)
+			destroy_everything(5);
 		if(sem_unlink(SHARED_MEM) == -1)
 			destroy_everything(5);
-		if(unlink(INPUT_PIPE) == -1)
+		/*if(unlink(INPUT_PIPE) == -1)
 			destroy_everything(7);
-	
+*/
+
+		if(sem_close(mutex_log_file)==-1)
+			destroy_everything(5);
+
 		if(sem_close(mutex_statistic)==-1)
 			destroy_everything(5);
 		if(sem_close(mutex_race_managing_shm)==-1)
 			destroy_everything(5);
-		
+		/*
 		if(close(fd_named_pipe)==-1)
 			destroy_everything(7);
-		
-		
+*/
+	
+
+
 		if(shmdt(stats)==-1)
 			destroy_everything(1);
 		if(shmctl(id_stat,IPC_RMID,NULL)==-1)
@@ -420,7 +444,7 @@ void signal_sigint()
 		printf("RACE SIMULATOR[%d] Ended\n",getpid());
 		exit(0);
 	}
-	
+
 	exit(0);
 }
 
@@ -455,19 +479,21 @@ void destroy_everything(int n)
 	}
 
 	sem_unlink(STATS);
-
+	sem_unlink(WRITE_LOG);		
 	sem_unlink(SHARED_MEM);
-	unlink(INPUT_PIPE);
 
+	unlink(INPUT_PIPE);
 	sem_close(mutex_statistic);
-	
+	sem_close(mutex_log_file);
+	sem_close(mutex_race_managing_shm);
+
+
 	close(fd_named_pipe);
-	
 	shmdt(stats);
 	shmctl(id_stat,IPC_RMID,NULL);
 	msgctl(mqid,IPC_RMID,NULL);
 	printf("Execute kill_ipcs.sh to clean all ipcs");
-	system("killall -9 project_exe");
+	system("killall -9 a");
 	exit(1);
 }
 
