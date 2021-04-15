@@ -315,7 +315,12 @@ void teamManager()
 	int first = 1;
 	int aux = 0;
 	int y = 0;
+	int b = 1;
 	int x = 0;
+	while(b){
+	if(strcmp(buff,"START RACE!") == 0){
+		b = false;
+	}
 	for(int i=0; i< strlen(buf);; i++){
 		if(x == 1){
 			if(buf[i] == ',' || buf[i] == '\n'){
@@ -343,7 +348,7 @@ void teamManager()
 			y = 1;
 		
 	}
-	
+	}
 
 	for (int i = 0; i < 3; ++i)
 	{
@@ -466,12 +471,12 @@ void signal_sigint()
 		/*if(unlink(INPUT_PIPE) == -1)
 			destroy_everything(7);
 */
-
 		if(sem_close(mutex_log_file)==-1)
 			destroy_everything(5);
 
 		if(sem_close(mutex_statistic)==-1)
 			destroy_everything(5);
+
 		if(sem_close(mutex_race_managing_shm)==-1)
 			destroy_everything(5);
 		/*
