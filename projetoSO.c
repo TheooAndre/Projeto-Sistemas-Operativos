@@ -283,18 +283,67 @@ void raceManager()
 	}
 }
 
+
 void teamManager()
 {
+	char buf[512];
+	int fd_named_pipe, n;
 	//CRIAR THREADS CARRO
 	team_manager = getpid();
 	#ifdef DEBUG
 	printf("[%d] Team Manager Process created\n",getpid());
 	#endif
 	//Adiciona os carros de acordo aos comandos da named pipe!
-	/*if((fd_named_pipe=(mkfifo(INPUT_PIPE,O_CREAT|0600)<0)) && errno!=EEXIST)
+	if((mkfifo(INPUT_PIPE,O_CREAT|0600)<0) && errno!=EEXIST)
 		destroy_everything(7);
 	if((fd_named_pipe = open(INPUT_PIPE,O_RDWR)) < 0)
 		destroy_everything(7);*/
+
+	while( (n = read(fd, buf, 512) ) > 0) {
+
+        	if ( write(STDOUT_FILENO, buf, n) != n) { 
+            		destroy_everything(7);
+        	}
+    	}
+    	close(fd);
+	}
+	
+	char team;
+	int values [4];
+	char modelo[] = "ADDCAR TEAM:";
+	char aux[512];
+	int first = 1;
+	int aux = 0;
+	int y = 0;
+	int x = 0;
+	for(int i=0; i< strlen(buf);; i++){
+		if(x == 1){
+			if(buf[i] == ',' || buf[i] == '\n'){
+				if(first == 1){
+					team = aux[0];
+				}else{
+					for(i=0; i < strlen(aux); i++){
+						int values[aux2] = values[aux2] * 10 + ( num[i] - '0' );
+					}
+					aux2++;
+				}
+				aux = 0;
+				memset(buf,0,strlen(buf));
+				x = 0;
+				
+			}
+			aux[aux] = buf[i];
+			aux++;
+		}
+		if(y == 1 && buf[i] == ' '){
+			x = 1;
+			y = 0;
+		}
+		if(buf[i] == ':')
+			y = 1;
+		
+	}
+	
 
 	for (int i = 0; i < 3; ++i)
 	{
