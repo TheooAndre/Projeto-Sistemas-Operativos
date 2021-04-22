@@ -6,11 +6,7 @@
 *
 */
 
-/* Para defesa Intermedia falta:
-*	-Criação dos processos Gestores de Equipa
-*	-Criar threads carro
-*	-Envio sincronizado do output para ficheiro de log e ecrã. **
-*/
+
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -43,6 +39,18 @@
 #define DEBUG
 
 //--STRUCTS------------------
+typedef struct Data{
+	int time_units_second;
+	int lap_distance;
+	int lap_count;
+	int team_count;
+	int breakdown_check_timer;
+	int min_pit;
+	int max_pit;
+	int fuel_capacity;
+	int top_5[5];
+	int last_place;
+}Data;
 
 typedef struct Statistics
 {
@@ -71,6 +79,7 @@ typedef struct Car
 }Car;
 
 //--GLOBAL VARIABLES---------
+Data* data;
 Statistics* stats;
 pid_t teams[NUM_TEAMS];
 pid_t race_simulator, malfunction_manager, race_manager, team_manager;
@@ -86,7 +95,7 @@ int id_stat;
 Car car_struct[MAX_CARS];
 sigset_t block_sigs;
 //--FUNCTIONS-----------------
-int* config();
+void config();
 void raceManager();
 void signal_sigint();
 void handl_sigs();
@@ -198,7 +207,7 @@ int main(){ // Race Simulator
 
 
 
-int* config (void){
+void config (void){
 	FILE * fp;
 	static int array[0];
 	char *token;
@@ -222,8 +231,26 @@ int* config (void){
 		}
 	}
 	fclose(fp);
-	return array;
+	int *ar;
+	ar =  array;
+	data->time_units_second = *(ar);
+	data->lap_distance = *(ar +1);
+	data->lap_count = *(ar+2);  //ver depois
+	if(*(ar+3)>2){
+		stats-> team_count = *(ar+3);
+
+	}else{
+		printf("Minimum of 3 teams required to start race\nExiting simulator...\n");
+		log_file_write("Minimum of 3 teams required to start race\nExiting simulator...\n");
+		exit(1);
+	}
+
+	data->breakdown_check_timer = *(ar+4);
+	data->min_pit = *(ar+5);
+	data->max_pit = *(ar+6);
+	data->fuel_capacity = *(ar+7);
 }
+
 void log_file_write(char* words)
 {
 	/*We call this function everytime we want to write something to log
@@ -267,12 +294,12 @@ void raceManager()
 	#endif
 	log_file_write("Race Manager Process created\n");
 	//exit() //Remove later
-	for (int i = 0; i < NUM_TEAMS; i++){
+	for (int i = 0; i < data->team_count; i++){
 		if((teams[i] = fork()) == 0){
 			#ifdef DEBUG
 			printf("TEAM MANAGER STARTED\n");
 			#endif
-			//log_file_write("TEAM MANAGER STARTED\n");
+			log_file_write("TEAM MANAGER STARTED\n");
 			teamManager();
 			exit(0);
 
@@ -297,7 +324,7 @@ void teamManager()
 	if((mkfifo(INPUT_PIPE,O_CREAT|0600)<0) && errno!=EEXIST)
 		destroy_everything(7);
 	if((fd_named_pipe = open(INPUT_PIPE,O_RDWR)) < 0)
-		destroy_everything(7);*/
+		destroy_everything(7);
 
 	while( (n = read(fd, buf, 512) ) > 0) {
 
@@ -305,8 +332,8 @@ void teamManager()
             		destroy_everything(7);
         	}
     	}
-    	close(fd);
-	}
+	close(fd);
+	
 	
 	char team;
 	int values [4];
@@ -350,8 +377,10 @@ void teamManager()
 	}
 	}
 
-	for (int i = 0; i < 3; ++i)
+	sem_wait(mutex_race_managing_shm);
+	for (int i = 0; i < data->num_carros; ++i)
 	{
+
 		/*
 		int lap_count;
 		int fuel_capacity;
@@ -378,7 +407,7 @@ void teamManager()
 	#ifdef DEBUG
 	printf("All cars created\n");
 	#endif
-
+	sem_post(mutex_race_managing_shm);
 	exit(0); //Remove later
 }
 
@@ -406,8 +435,6 @@ void malfunctionManager()
 
 void creat_shm_statistics()
 {
-	int *ar;
-	ar =  config();
 
 	//CHANGE STATS CONFIGURATION LATER
 	id_stat = shmget(IPC_PRIVATE,sizeof(Statistics),IPC_CREAT|0777);
@@ -420,26 +447,8 @@ void creat_shm_statistics()
 		destroy_everything(1);
 		}
 	stats = (Statistics*)malloc(sizeof(Statistics));
-	stats->time_units_second = *(ar);
-	stats->lap_distance = *(ar +1);
-	stats->lap_count = *(ar+2);  //ver depois
-	if(*(ar+3)>2){
-		stats-> team_count = *(ar+3);
-
-	}else{
-		printf("Minimum of 3 teams required to start race\nExiting simulator...\n");
-		log_file_write("Minimum of 3 teams required to start race\nExiting simulator...\n");
-		exit(1);
-	}
-
-	stats->breakdown_check_timer = *(ar+4);
-	stats->min_pit = *(ar+5);
-	stats->max_pit = *(ar+6);
-	stats->fuel_capacity = *(ar+7);
 
 	fflush(stdout);
-
-
 }
 
 void signal_sigint()
@@ -447,9 +456,7 @@ void signal_sigint()
 
 	if (getpid() == race_simulator)
 	{
-		/*if((fd_named_pipe = open(INPUT_PIPE,O_RDWR)) < 0)
-			destroy_everything(7);
-*/
+		
 		int i = 0;
 		/*char buf[MAX_NAME];
 		sprintf(buf,"CAR FREE ");
@@ -468,9 +475,9 @@ void signal_sigint()
 			destroy_everything(5);
 		if(sem_unlink(SHARED_MEM) == -1)
 			destroy_everything(5);
-		/*if(unlink(INPUT_PIPE) == -1)
+		if(unlink(INPUT_PIPE) == -1)
 			destroy_everything(7);
-*/
+
 		if(sem_close(mutex_log_file)==-1)
 			destroy_everything(5);
 
@@ -479,10 +486,10 @@ void signal_sigint()
 
 		if(sem_close(mutex_race_managing_shm)==-1)
 			destroy_everything(5);
-		/*
+		
 		if(close(fd_named_pipe)==-1)
 			destroy_everything(7);
-*/
+
 	
 
 
