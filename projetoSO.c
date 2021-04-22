@@ -294,6 +294,7 @@ void raceManager()
 	#endif
 	log_file_write("Race Manager Process created\n");
 	//exit() //Remove later
+	printf("%d num_carros teste\n", data->team_count);
 	for (int i = 0; i < data->team_count; i++){
 		if((teams[i] = fork()) == 0){
 			#ifdef DEBUG
@@ -378,6 +379,7 @@ void teamManager()
 	}
 
 	sem_wait(mutex_race_managing_shm);
+	printf("%d num_carros teste\n", data->num_carros);
 	for (int i = 0; i < data->num_carros; ++i)
 	{
 
