@@ -40,6 +40,7 @@
 
 //--STRUCTS------------------
 typedef struct Data{
+	int numcar;
 	int time_units_second;
 	int lap_distance;
 	int lap_count;
@@ -68,13 +69,17 @@ typedef struct Statistics
 
 typedef struct Car
 {
+
 	int car_id;
-	int lap_count;
-	int fuel_capacity;
+	int speed;
+	int lap_counter;
+	int consumption;
+	int fuel;
+	int fiability;
 	int issecurity; // verificar se esta no modo seguranca ou nao(normal)
 	int isRacing;
 	int isInBox;
-	int isEmpty;
+	int isquit;
 	int isDone;
 }Car;
 
@@ -245,10 +250,11 @@ void config (void){
 		exit(1);
 	}
 
-	data->breakdown_check_timer = *(ar+4);
-	data->min_pit = *(ar+5);
-	data->max_pit = *(ar+6);
-	data->fuel_capacity = *(ar+7);
+	data->numcar = *(ar+4);
+	data->breakdown_check_timer = *(ar+5);
+	data->min_pit = *(ar+6);
+	data->max_pit = *(ar+7);
+	data->fuel_capacity = *(ar+8);
 }
 
 void log_file_write(char* words)
@@ -346,7 +352,7 @@ void teamManager()
 	int b = 1;
 	int x = 0;
 	while(b){
-	if(strcmp(buff,"START RACE!") == 0){
+	if(strcmp(buf,"START RACE!") == 0){
 		b = false;
 	}
 	for(int i=0; i< strlen(buf);; i++){
@@ -416,9 +422,58 @@ void teamManager()
 
 void *car(void *n)
 {
+	#gravar os log
 	Car car = *((Car *)n);
 	#ifdef DEBUG
+	int o = 0;
 	printf("[%d]Car created\n",car.car_id);
+	for(int i = 0; i< data.lap_count; i++){
+		if (car.isquit == 1){
+			break;
+		}
+		o = 0;
+		if((car.issecurity == 1 || car.requestbox == 1)&& memoriapartilhadaboxislivre){
+			car.isRacing = 0;
+			car.isInBox = 1;
+			setmemoriapartilhadaboxischeia;
+			int randnum = (rand() %(max_pit - min_pit + 1)) + min_pit;
+			sleep(randnum);
+			sleep(2);
+			car.fuel = data.fuel_capacity;
+			car.requestbox = 0;
+			car.issecurity = 0;
+			car.isInBox = 1;
+			car.isInBox = 1;
+			car.isRacing = 1;
+			car.requestbox = 0;
+		}
+		while(o < lap_distance){
+			if (car.fuel < car.consumption){
+				car.isquit = 1;
+			}else if(car.fuel <= ((lap_distance/car.speed) * car.consumption) * 4){
+				car.requestbox = 1;
+				if(car.fuel <= ((lap_distance/car.speed) * car.consumption) * 2){
+					car.issecurity = 1;
+					setmemoriapartilhadacarrosecurity;
+				}
+			}
+			sleep(time_units_second);
+			o += speed;
+			car.fuel -= car.consumption;
+		}
+		car.lap_counter += 1;
+	}
+	if (car.isquit == 1){
+		#grava no log
+		printf("gave up");
+	}else{
+		for(int i = 0; i<5, i++){
+			if(!top_5[i]){
+				top_5[i] = car.car_id;  
+			}
+		}
+		car.isDone = 1;
+	}
 	#endif
 	pthread_exit(NULL);
 }
@@ -429,6 +484,19 @@ void malfunctionManager()
 	malfunction_manager = getpid();
 	#ifdef DEBUG
 	printf("[%d] Malfunction Manager Process created\n",getpid());
+	while(1){
+		sleep(data->breakdown_check_timer);
+		for(int i = 0; i < numcar; i++){
+			if(car_struct[i]->isRacing == 1){
+				int randnum = (rand() %(100 - 1 + 1)) + 1;
+				if (randnum > car_struct[i]->fiability){
+					car_struct[i]->issecurity = 1;
+					car_struct[i]->consumption *= 0.4 # change variable to consumption;
+					car_struct[i]->speed *= 0.3;
+				}
+			}
+		}
+	}
 	#endif
 	exit(0); // Remove later
 }
