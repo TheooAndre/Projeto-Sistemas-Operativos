@@ -1,4 +1,4 @@
-/* bb
+* bb
 * 				  RACE SIMULATOR
 *      			 Operating Systems
 *
@@ -84,6 +84,8 @@ typedef struct Car
 }Car;
 
 //--GLOBAL VARIABLES---------
+pthread_cond_t cond_box=PTHREAD_COND_INITIALIZER;
+pthread_mutex_t mutex_box=PTHREAD_MUTEX_INITIALIZER;
 Data* data;
 Statistics* stats;
 pid_t teams[NUM_TEAMS];
@@ -181,6 +183,8 @@ int main(){ // Race Simulator
 	
 	race_simulator = getpid();
 	int p_race_manager,p_malfunction_manager;
+	
+	createNamedPipe();
 
 	p_race_manager = fork();
 	if (p_race_manager < 0){
@@ -318,6 +322,18 @@ void raceManager()
 }
 
 
+void createNamedPipe(){
+	if((mkfifo(PIPE_NAME,O_CREAT|O_EXCL|0600)<0) && (errno != EEXIST)){
+		destroy_everything(7);
+	}else{
+		log_file_write("NAMED PIPE CREATED");
+	}
+	if ((fd_named_pipe = open(PIPE_NAME, O_RDWR)) < 0) {
+        		destroy_everything(7);
+    	}
+}
+
+
 void teamManager()
 {
 	char buf[512];
@@ -328,10 +344,6 @@ void teamManager()
 	printf("[%d] Team Manager Process created\n",getpid());
 	#endif
 	//Adiciona os carros de acordo aos comandos da named pipe!
-	if((mkfifo(INPUT_PIPE,O_CREAT|0600)<0) && errno!=EEXIST)
-		destroy_everything(7);
-	if((fd_named_pipe = open(INPUT_PIPE,O_RDWR)) < 0)
-		destroy_everything(7);
 
 	while( (n = read(fd, buf, 512) ) > 0) {
 
@@ -383,6 +395,8 @@ void teamManager()
 		
 	}
 	}
+	
+
 
 	sem_wait(mutex_race_managing_shm);
 	printf("%d num_carros teste\n", data->num_carros);
@@ -412,6 +426,32 @@ void teamManager()
 			destroy_everything(6);
 		usleep(20);
 	}
+	
+	while(1){
+		for(int i = 0; i < data->num_carros; ++i){
+			if(car_struct[i].isInBox){
+				int randnum = (rand() %(max_pit - min_pit + 1)) + min_pit;
+				sleep(randnum);
+				sleep(2);
+				car.fuel = data.fuel_capacity;
+				car.requestbox = 0;
+				
+
+				if(pthread_mutex_lock(& mutex_box)!=0)
+            				destroy_everything(5);
+
+				//alter  condition
+				car.isInBox = 0
+
+				// Wakeup at least one of the threads that are waiting on the condition (if any)
+				pthread_cond_signal (&cond_box);
+
+				// allow others to proceed
+				if(pthread_mutex_unlock(&mutex_box)!=0) destroy_everything(5);
+			}
+		}
+	}
+
 	#ifdef DEBUG
 	printf("All cars created\n");
 	#endif
@@ -435,17 +475,21 @@ void *car(void *n)
 		if((car.issecurity == 1 || car.requestbox == 1)&& memoriapartilhadaboxislivre){
 			car.isRacing = 0;
 			car.isInBox = 1;
+			
+			if(pthread_mutex_lock(& mutex_box)!=0)
+            			destroy_everything(5);
+        		while(car.isInBox)
+        		{
+            			if (pthread_cond_wait(&cond_box,&mutex_box)!=0)
+                 			destroy_everything(5);
+        			}
+        			if(pthread_mutex_unlock(&mutex_box)!=0)destroy_everything(5);
+			}
 			setmemoriapartilhadaboxischeia;
-			int randnum = (rand() %(max_pit - min_pit + 1)) + min_pit;
-			sleep(randnum);
-			sleep(2);
-			car.fuel = data.fuel_capacity;
-			car.requestbox = 0;
 			car.issecurity = 0;
-			car.isInBox = 1;
-			car.isInBox = 1;
+			car.consumption /= 0.4 # change variable to consumption;
+			car.speed /= 0.3;
 			car.isRacing = 1;
-			car.requestbox = 0;
 		}
 		while(o < lap_distance){
 			if (car.fuel < car.consumption){
