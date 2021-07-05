@@ -1,7 +1,7 @@
 CC=gcc
 FLAGS=-pthread -Wall -g
 PROG=test
-OBJS=projetoSO.o
+OBJS=projeto_so.o
 
 all: ${PROG}
 
@@ -16,4 +16,4 @@ ${PROG}:	${OBJS}
 
 ##########################################
 
-03.o:	projetoSO.c
+03.o:	projeto_so.c
